@@ -24,7 +24,7 @@ CRITICAL INSTRUCTIONS:
 """
 
 class AutonomousMCPClient:
-    def __init__(self, base_url, api_key, task: str, integrations_dir: str = "integrations"):
+    def __init__(self, base_url, task: str, api_key = "x", integrations_dir: str = "integrations"):
         self.integrations_dir = integrations_dir
         self.task = task
         self.base_url = base_url
