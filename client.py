@@ -7,20 +7,24 @@ from contextlib import AsyncExitStack
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.session import ClientSession
 from openai import AsyncOpenAI
+import datetime
 
-SYSTEM_PROMPT = """You are an autonomous AI engineering assistant. Your goal is to accomplish the task given by the user.
+current_time = datetime.datetime.now().strftime("%d %B %Y, %H:%M:%S")
 
+SYSTEM_PROMPT = f"""You are an autonomous AI engineering assistant. Your goal is to accomplish the task given by the user and create new tools if you're unable to provide the information the user is asking for.
+Today is {current_time}
 CRITICAL INSTRUCTIONS:
 1. THINK STEP-BY-STEP: Before taking action, outline the logical steps needed to accomplish the task.
 2. USE TOOLS NATIVELY: You have access to a dynamically updating set of tools. You MUST use the native JSON tool calling format provided by the API. 
    **DO NOT** write raw XML tags like `<tool_call>`, `<function>`, or markdown code blocks for tools. Use the actual function calling mechanism.
-3. SELF-EVOLVE: If you are asked to perform a task but cannot find a suitable tool, you MUST write a new Python MCP server script to accomplish it.
-    - Call the `generate_server_code` tool to get a template.
-    - Implement the logic.
-    - Call `save_and_deploy_tool` to write it to the system.
-    - Once deployed, the client will auto-load it, and you can call your newly created tool in the next step.
-4. EXCLUDE TEMP FILES: When generating scripts that interact with the file system, ignore temporary files, caches (like __pycache__), and hidden version control directories (like .git).
-5. Output final results clearly once the task is complete.
+3. SELF-EVOLVE & FIX EXISTING TOOLS: If you need a new capability or if a tool execution fails:
+    - FIRST: Call `list_integration_files` to check if a relevant script already exists.
+    - IF AN EXISTING TOOL FAILS: Do not create a duplicate file (e.g., `tool_v2.py`). Instead, call `read_server_code` to read the failing script, find the bug, and use `save_and_deploy_tool` to OVERWRITE and fix the exact same file.
+    - IF NO TOOL EXISTS: Call `generate_server_code` to get a template, implement the logic, and call `save_and_deploy_tool` to create it.
+4. FILE SYSTEM TRACKING: When generating scripts that interact with the file system, ignore temporary files and caches (like `__pycache__`).
+5. CORRELATE MULTIPLE SOURCES: When gathering data from different tool calls, scripts, or files, actively cross-reference and synthesize the information. Do not treat tool outputs in isolation. Piece the data together to form a complete, accurate picture and resolve any discrepancies before taking your next step.
+6. DEPENDENCIES: Newly generated tools include a top-level `while True` try/except block for imports. If your tool needs external pip packages, place the `import` statements INSIDE that try block so they are automatically resolved at runtime.
+7. Output final results clearly once the task is complete.
 """
 
 class AutonomousMCPClient:
@@ -31,7 +35,8 @@ class AutonomousMCPClient:
         self.api_key = api_key
         self.sessions = {}       
         self.tool_registry = {}  
-        self.mcp_tools = {}      
+        self.mcp_tools = {}
+        self.script_mtimes = {}      
         self.exit_stack = AsyncExitStack()
         
         # Configure OpenAI compatible client
@@ -59,11 +64,19 @@ class AutonomousMCPClient:
 
         for script_path in scripts:
             server_name = os.path.basename(script_path).replace('.py', '')
-            if server_name in self.sessions:
-                continue 
+            current_mtime = os.path.getmtime(script_path)
             
-            new_servers_found = True
-            print(f"[System] Booting new server: '{server_name}'...")
+            # Check if server is running AND hasn't been modified
+            if server_name in self.sessions:
+                last_mtime = self.script_mtimes.get(server_name, 0)
+                if current_mtime <= last_mtime:
+                    continue # Skip only if the file hasn't changed
+                else:
+                    print(f"[System] Detected updates in '{server_name}'. Reloading...")
+                    new_servers_found = True
+            else:
+                print(f"[System] Booting new server: '{server_name}'...")
+                new_servers_found = True
             
             server_params = StdioServerParameters(
                 command=sys.executable,
@@ -78,14 +91,16 @@ class AutonomousMCPClient:
                 session = await self.exit_stack.enter_async_context(ClientSession(read, write))
                 await session.initialize()
                 
+                # Update our dictionaries with the new session and the latest modification time
                 self.sessions[server_name] = session
+                self.script_mtimes[server_name] = current_mtime
                 
                 response = await session.list_tools()
                 for tool in response.tools:
                     self.tool_registry[tool.name] = server_name
                     self.mcp_tools[tool.name] = tool
                     
-                print(f"[+] Connected to '{server_name}' ({len(response.tools)} tools)")
+                print(f"[+] Successfully connected to '{server_name}' ({len(response.tools)} tools)")
             except Exception as e:
                 print(f"[-] Failed to connect to '{server_name}': {e}")
                 

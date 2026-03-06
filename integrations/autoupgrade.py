@@ -5,8 +5,8 @@ from mcp.server.fastmcp import FastMCP
 
 class RunaMCP:
     """
-    An MCP Server that can dynamically generate and save new MCP server scripts
-    to the integrations folder for persistent use.
+    An MCP Server that can dynamically generate, read, modify, and save 
+    new MCP server scripts to the integrations folder for persistent use.
     """
 
     def __init__(self, name: str = "RunaMCP", integrations_dir: str = "integrations"):
@@ -21,7 +21,7 @@ class RunaMCP:
 
     def _register_meta_tools(self):
         """
-        Registers the tools that allow the server to create new tools.
+        Registers the tools that allow the server to create and modify tools.
         """
 
         @self.mcp.tool()
@@ -34,19 +34,55 @@ class RunaMCP:
             return [f for f in os.listdir(self.integrations_dir) if f.endswith('.py')]
 
         @self.mcp.tool()
+        def read_server_code(server_name: str) -> str:
+            """
+            Reads the content of an existing MCP server script. 
+            Use this to understand existing code before making modifications.
+            """
+            if server_name == "autoupgrade" or server_name == os.path.splitext(os.path.basename(__file__))[0]:
+                return f"Error: Read access to the core '{server_name}' file is restricted."
+                
+            file_path = os.path.join(self.integrations_dir, f"{server_name}.py")
+            
+            if not os.path.exists(file_path):
+                return f"Error: File '{server_name}.py' does not exist."
+                
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                return f"Error reading file: {str(e)}"
+
+        @self.mcp.tool()
         def generate_server_code(tool_name: str, tool_description: str) -> str:
             """
-            Generates a template for a new standalone FastMCP server script.
+            Generates a template for a new standalone FastMCP server script, equipped with auto-install capabilities.
             """
-            # Fixed the f-string by removing the curly braces around @mcp.tool()
-            code = f'''from mcp.server.fastmcp import FastMCP
+            code = f'''import os
+import sys
+import subprocess
+
+# Auto-installer for tool dependencies
+while True:
+    try:
+        from mcp.server.fastmcp import FastMCP
+        # Add your required module imports here
+        break
+    except ModuleNotFoundError as e:
+        missing_module = e.name
+        try:
+            print(f"[Auto-Install] Missing dependency '{{missing_module}}'. Installing...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", missing_module])
+        except subprocess.CalledProcessError:
+            print(f"Failed to install {{missing_module}}")
+            sys.exit(1)
 
 mcp = FastMCP("{tool_name}")
 
 @mcp.tool()
 def {tool_name}_execute(query: str) -> str:
     """Auto-generated tool for: {tool_description}"""
-    # TODO: Implement actual logic here
+    # Implement actual logic here
     return f"Execution of {tool_name} with query: {{query}}"
 
 if __name__ == "__main__":
@@ -57,7 +93,7 @@ if __name__ == "__main__":
         @self.mcp.tool()
         def save_and_deploy_tool(server_name: str, code: str) -> str:
             """
-            Saves the provided Python code as a new script in the integrations folder.
+            Saves or overwrites the provided Python code as a script in the integrations folder.
             
             Args:
                 server_name: The name of the file (without .py extension).
@@ -65,6 +101,10 @@ if __name__ == "__main__":
             """
             if not server_name.isidentifier():
                 return f"Error: '{server_name}' is not a valid filename/identifier."
+                
+            # Strict safeguard against modifying the autoupgrade file or the runtime file
+            if server_name == "autoupgrade" or server_name == os.path.splitext(os.path.basename(__file__))[0]:
+                return f"Error: Modification of the core '{server_name}' file is strictly prohibited."
                 
             if not code:
                 return "Error: No code provided."
@@ -78,7 +118,7 @@ if __name__ == "__main__":
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(code)
                 
-                return f"Success! New tool server saved to {file_path}. It will be picked up by the auto-client on next refresh."
+                return f"Success! Tool server saved to {file_path}. It will be picked up by the auto-client on next refresh."
             except Exception as e:
                 return f"Error saving file: {str(e)}"
 
