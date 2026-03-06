@@ -3,13 +3,13 @@ import sys
 from typing import Callable
 from mcp.server.fastmcp import FastMCP
 
-class SelfRefiningMCP:
+class RunaMCP:
     """
     An MCP Server that can dynamically generate and save new MCP server scripts
     to the integrations folder for persistent use.
     """
 
-    def __init__(self, name: str = "AutoEvolver", integrations_dir: str = "integrations"):
+    def __init__(self, name: str = "RunaMCP", integrations_dir: str = "integrations"):
         self.mcp = FastMCP(name)
         self.integrations_dir = integrations_dir
         
@@ -88,5 +88,5 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
     # Initialize the Self-Refining Server
-    server = SelfRefiningMCP(name="EvolvingMCP")
+    server = RunaMCP(name="RunaMCP")
     server.run()

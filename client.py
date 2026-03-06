@@ -24,10 +24,11 @@ CRITICAL INSTRUCTIONS:
 """
 
 class AutonomousMCPClient:
-    def __init__(self, base_url, task: str, integrations_dir: str = "integrations"):
+    def __init__(self, base_url, api_key, task: str, integrations_dir: str = "integrations"):
         self.integrations_dir = integrations_dir
         self.task = task
         self.base_url = base_url
+        self.api_key = api_key
         self.sessions = {}       
         self.tool_registry = {}  
         self.mcp_tools = {}      
@@ -36,7 +37,7 @@ class AutonomousMCPClient:
         # Configure OpenAI compatible client
         self.llm = AsyncOpenAI(
             base_url=self.base_url,
-            api_key="x",
+            api_key=self.api_key,
         )
         self.model = "your-local-model-name" # Make sure this is a model good at coding/tools (e.g. Qwen2.5-Coder or Llama-3.1)
 
