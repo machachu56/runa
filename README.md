@@ -4,15 +4,15 @@ Runa is a self-evolving AI framework that automatically creates and integrates n
 
 ---
 
-> **WARNING**
->
-> **Runa operates autonomously and has the ability to write code, modify your system, and dynamically install Python packages.** > 
-> Because it searches for and executes logic on the fly, it may install unwanted, deprecated, or potentially insecure third-party libraries without human intervention. 
->
-> By using this software, you acknowledge and agree that:
-> * You are running this framework entirely at your own risk.
-> * The creator/maintainer of this repository is **NOT** responsible or liable for any damages, data loss, security breaches, or system corruption caused by the use of this tool or the libraries it chooses to install.
-> * It is highly recommended to run Runa exclusively within a strictly isolated environment, such as a Docker container, a dedicated Virtual Machine, or a restricted sandbox.
+## **WARNING**
+
+**Runa operates autonomously and has the ability to write code, modify your system, and dynamically install Python packages.** > 
+Because it searches for and executes logic on the fly, it may install unwanted, deprecated, or potentially insecure third-party libraries without human intervention. 
+
+By using this software, you acknowledge and agree that:
+* You are running this framework entirely at your own risk.
+* The creator/maintainer of this repository is **NOT** responsible or liable for any damages, data loss, security breaches, or system corruption caused by the use of this tool or the libraries it chooses to install.
+* It is highly recommended to run Runa exclusively within a strictly isolated environment, such as a Docker container, a dedicated Virtual Machine, or a restricted sandbox.
 
 ---
 
