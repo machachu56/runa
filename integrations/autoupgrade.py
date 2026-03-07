@@ -2,8 +2,6 @@ import os
 import sys
 from typing import Callable
 from mcp.server.fastmcp import FastMCP
-import importlib
-import inspect
 
 class RunaMCP:
     """
@@ -15,8 +13,9 @@ class RunaMCP:
         self.mcp = FastMCP(name)
         self.integrations_dir = integrations_dir
         
-        # Ensure the integrations directory exists
+        # Ensure the integrations and cloned_repos directories exist
         os.makedirs(self.integrations_dir, exist_ok=True)
+        os.makedirs("cloned_repos", exist_ok=True)
 
         # Register the tools that allow the server to upgrade the system
         self._register_meta_tools()
@@ -37,134 +36,152 @@ class RunaMCP:
         
         @self.mcp.tool()
         def search_github_python_libraries(query: str, max_results: int = 5) -> str:
-                """
-                Searches GitHub for Python repositories based on natural language or keywords.
-                Use this to find external libraries to accomplish tasks you don't currently have tools for.
-                Results are sorted by stars to prioritize popular, community-trusted repositories.
-                """
-                import urllib.request
-                import urllib.parse
-                import json
+            """
+            Searches GitHub for Python repositories based on natural language or keywords.
+            Use this to find external libraries to accomplish tasks you don't currently have tools for.
+            Results are sorted by stars to prioritize popular, community-trusted repositories.
+            """
+            import urllib.request
+            import urllib.parse
+            import json
+            
+            try:
+                encoded_query = urllib.parse.quote(f"{query} language:python")
+                url = f"https://api.github.com/search/repositories?q={encoded_query}&sort=stars&order=desc&per_page={max_results}"
                 
-                try:
-                    # Format the search query to strictly look for Python repositories
-                    encoded_query = urllib.parse.quote(f"{query} language:python")
+                req = urllib.request.Request(url, headers={'User-Agent': 'Runa-Autonomous-Agent'})
+                
+                with urllib.request.urlopen(req) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                
+                items = data.get("items", [])
+                
+                if not items:
+                    return f"No Python repositories found on GitHub for query: '{query}'"
+                
+                results = ["Found the following Python repositories on GitHub (sorted by stars):"]
+                for i, repo in enumerate(items):
+                    name = repo.get("full_name", "Unknown")
+                    stars = repo.get("stargazers_count", 0)
+                    desc = repo.get("description", "No description provided.")
+                    repo_url = repo.get("html_url", "No URL")
                     
-                    # Hit the GitHub API, sorting by stars (popularity/safety), and limit results
-                    url = f"https://api.github.com/search/repositories?q={encoded_query}&sort=stars&order=desc&per_page={max_results}"
-                    
-                    # GitHub strictly requires a User-Agent header for all API requests
-                    req = urllib.request.Request(url, headers={'User-Agent': 'Runa-Autonomous-Agent'})
-                    
-                    with urllib.request.urlopen(req) as response:
-                        data = json.loads(response.read().decode('utf-8'))
-                    
-                    items = data.get("items", [])
-                    
-                    if not items:
-                        return f"No Python repositories found on GitHub for query: '{query}'"
-                    
-                    results = ["Found the following Python repositories on GitHub (sorted by stars):"]
-                    for i, repo in enumerate(items):
-                        name = repo.get("full_name", "Unknown")
-                        stars = repo.get("stargazers_count", 0)
-                        desc = repo.get("description", "No description provided.")
-                        repo_url = repo.get("html_url", "No URL")
-                        
-                        results.append(f"{i+1}. Repository: '{name}' (⭐ {stars} stars)\n   Description: {desc}\n   URL: {repo_url}")
-                    
-                    return "\n\n".join(results)
-                    
-                except urllib.error.HTTPError as e:
-                    # GitHub's unauthenticated search API has a rate limit of 10 requests per minute
-                    if e.code == 403:
-                        return "Error: GitHub API rate limit exceeded. Please wait a minute before trying again."
-                    return f"HTTP Error searching GitHub: {e.code} - {e.reason}"
-                except Exception as e:
-                    return f"Error searching GitHub: {str(e)}"
+                    results.append(f"{i+1}. Repository: '{name}' (⭐ {stars} stars)\n   Description: {desc}\n   URL: {repo_url}")
+                
+                return "\n\n".join(results)
+                
+            except urllib.error.HTTPError as e:
+                if e.code == 403:
+                    return "Error: GitHub API rate limit exceeded. Please wait a minute before trying again."
+                return f"HTTP Error searching GitHub: {e.code} - {e.reason}"
+            except Exception as e:
+                return f"Error searching GitHub: {str(e)}"
+            
         @self.mcp.tool()
-        def install_github_repository(repo_url: str) -> str:
+        def clone_github_repository(repo_url: str) -> str:
             """
-            Attempts to install a Python package directly from a GitHub repository URL.
-            Note: This will only work if the repository is structured as a proper Python package 
-            (containing a setup.py or pyproject.toml file).
-            
-            Args:
-                repo_url: The full GitHub repository URL (e.g., 'https://github.com/psf/requests')
+            Downloads and extracts a GitHub repository to a local 'cloned_repos' directory to inspect its source code.
+            Use this to download libraries you want to analyze before building a tool.
             """
-            import subprocess
-            import sys
-            
-            # Basic validation
+            import os
+            import urllib.request
+            import zipfile
+            import io
+            import shutil
+
             if not repo_url.startswith("https://github.com/"):
-                return "Error: Invalid GitHub URL. Must start with 'https://github.com/'"
+                return "Error: Invalid GitHub URL."
             
-            # Ensure it doesn't end with .git if the AI accidentally added it, 
-            # though pip usually handles it, it's safer to normalize.
-            clean_url = repo_url
+            clean_url = repo_url.rstrip("/")
             if clean_url.endswith('.git'):
                 clean_url = clean_url[:-4]
                 
-            try:
-                print(f"[System] Attempting to install package from: {clean_url}")
-                install_target = f"git+{clean_url}.git"
+            parts = clean_url.split('/')
+            if len(parts) < 2:
+                return "Error: Cannot parse owner and repository name from URL."
                 
-                # Run pip install and capture the output
-                result = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", install_target],
-                    capture_output=True,
-                    text=True
-                )
-                
-                if result.returncode == 0:
-                    return (
-                        f"Successfully installed repository from {clean_url}.\n\n"
-                        f"Installation Output:\n{result.stdout}\n\n"
-                        f"Next step: You can now use `read_installed_module_code` to inspect its contents. "
-                        f"Keep in mind the import name (e.g., 'bs4') might differ slightly from the GitHub repository name (e.g., 'beautifulsoup4')."
-                    )
-                else:
-                    return (
-                        f"Failed to install repository. This usually happens if the repository is not "
-                        f"packaged properly (missing setup.py or pyproject.toml).\n\n"
-                        f"Error Output:\n{result.stderr}\n\n"
-                        f"Recommendation: Try using a different repository from the search."
-                    )
-                    
-            except Exception as e:
-                return f"Exception occurred during installation: {str(e)}"
+            owner, repo_name = parts[-2], parts[-1]
+            target_dir = os.path.join("cloned_repos", repo_name)
             
+            # If already cloned, skip and return success
+            if os.path.exists(target_dir):
+                return (f"Repository already exists at '{target_dir}'.\n\n"
+                        f"Next step: Use `list_directory` on '{target_dir}' to see its files.")
+            
+            print(f"[System] Downloading repository {owner}/{repo_name} via GitHub API...")
+            
+            # Use GitHub API to get the zipball of the default branch
+            zip_url = f"https://api.github.com/repos/{owner}/{repo_name}/zipball"
+            req = urllib.request.Request(zip_url, headers={'User-Agent': 'Runa-Autonomous-Agent'})
+            
+            try:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    with zipfile.ZipFile(io.BytesIO(response.read())) as z:
+                        # Extract to a temporary folder first
+                        temp_extract_dir = os.path.join("cloned_repos", f"{repo_name}_temp")
+                        z.extractall(temp_extract_dir)
+                        
+                        # GitHub zips put everything inside a root folder named like 'owner-repo-commitHash'
+                        extracted_items = os.listdir(temp_extract_dir)
+                        if not extracted_items:
+                            return "Error: Downloaded zip archive is empty."
+                            
+                        extracted_root = os.path.join(temp_extract_dir, extracted_items[0])
+                        
+                        # Rename the crazy hash folder to our clean target_dir name
+                        os.rename(extracted_root, target_dir)
+                        
+                        # Cleanup the temp directory
+                        os.rmdir(temp_extract_dir)
+
+                return (f"Successfully downloaded '{repo_name}' into directory '{target_dir}'.\n\n"
+                        f"Next step: Use `list_directory` on '{target_dir}' to see its files, "
+                        f"then use `read_local_file` to read the README.md or relevant .py files.")
+                        
+            except urllib.error.HTTPError as e:
+                return f"HTTP Error downloading repository: {e.code} - {e.reason}. The repository might be private or deleted."
+            except Exception as e:
+                # Cleanup partially extracted files if it fails mid-way
+                if os.path.exists(target_dir):
+                    shutil.rmtree(target_dir, ignore_errors=True)
+                return f"Error downloading and extracting repository: {str(e)}"
+
         @self.mcp.tool()
-        def read_installed_module_code(module_name: str) -> str:
+        def list_directory(dir_path: str) -> str:
             """
-            Reads the actual source code of an installed Python module or package.
-            Use this to inspect library internals, verify available methods, or debug failed imports.
-            
-            Args:
-                module_name: The dot-separated module path (e.g., 'os', 'mcp.server.fastmcp', 'requests.models').
+            Lists all files and folders in a given local directory.
+            Use this to navigate cloned repositories to find the source code.
             """
+            import os
+            if not os.path.exists(dir_path):
+                return f"Error: Path '{dir_path}' does not exist."
             try:
-                # Dynamically import the requested module
-                module = importlib.import_module(module_name)
-                
-                # Attempt to retrieve the source code
-                source = inspect.getsource(module)
-                return source
-                
-            except ModuleNotFoundError:
-                return f"Error: Module '{module_name}' is not installed or cannot be found in the current environment."
-                
-            except TypeError:
-                # This exception triggers if the target is a built-in module (C extension) 
-                # where raw Python source code is not available.
-                try:
-                    file_path = inspect.getfile(module)
-                    return f"Error: '{module_name}' is a compiled/built-in module. Source code cannot be read directly as text. File located at: {file_path}"
-                except TypeError:
-                    return f"Error: '{module_name}' is a built-in module (like 'sys'). Source code is not accessible."
-                    
+                items = os.listdir(dir_path)
+                return f"Contents of {dir_path}:\n" + "\n".join([f"- {item}" for item in items])
             except Exception as e:
-                return f"Error reading module '{module_name}': {str(e)}"
+                return f"Error listing directory: {e}"
+
+        @self.mcp.tool()
+        def read_local_file(file_path: str) -> str:
+            """
+            Reads the content of any local text or python file.
+            Use this to inspect source code or README.md files inside cloned repositories.
+            """
+            import os
+            if not os.path.exists(file_path):
+                return f"Error: File '{file_path}' does not exist."
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    # Truncate string so we don't blow up the LLM's context window with massive files
+                    if len(content) > 15000:
+                        return content[:15000] + "\n\n...[FILE TRUNCATED DUE TO LENGTH]..."
+                    return content
+            except UnicodeDecodeError:
+                return "Error: File is not a readable text file (binary/image/etc)."
+            except Exception as e:
+                return f"Error reading file: {e}"
 
         @self.mcp.tool()
         def read_server_code(server_name: str) -> str:
