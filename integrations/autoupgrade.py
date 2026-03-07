@@ -35,7 +35,7 @@ class RunaMCP:
             return [f for f in os.listdir(self.integrations_dir) if f.endswith('.py')]
         
         @self.mcp.tool()
-        def search_github_python_libraries(query: str, max_results: int = 5) -> str:
+        def search_github_python_libraries(query: str, max_results: int = 20) -> str:
             """
             Searches GitHub for Python repositories based on natural language or keywords.
             Use this to find external libraries to accomplish tasks you don't currently have tools for.
