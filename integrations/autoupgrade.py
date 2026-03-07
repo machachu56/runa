@@ -221,10 +221,17 @@ while True:
     except ModuleNotFoundError as e:
         missing_module = e.name
         try:
-            print(f"[Auto-Install] Missing dependency '{{missing_module}}'. Installing...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", missing_module])
+            # REDIRECT PRINT TO STDERR
+            print(f"[Auto-Install] Missing dependency '{{missing_module}}'. Installing...", file=sys.stderr)
+            
+            # REDIRECT SUBPROCESS OUTPUT TO STDERR
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", missing_module],
+                stdout=sys.stderr, 
+                stderr=sys.stderr
+            )
         except subprocess.CalledProcessError:
-            print(f"Failed to install {{missing_module}}")
+            print(f"Failed to install {{missing_module}}", file=sys.stderr)
             sys.exit(1)
 
 mcp = FastMCP("{tool_name}")
