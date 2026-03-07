@@ -19,7 +19,7 @@ CRITICAL INSTRUCTIONS:
    **DO NOT** write raw XML tags like `<tool_call>`, `<function>`, or markdown code blocks for tools. Use the actual function calling mechanism.
 3. SELF-EVOLVE & FIX EXISTING TOOLS: If you need a new capability or if a tool execution fails:
     - FIRST: Call `list_integration_files` to check if a relevant script already exists.
-    - IF YOU LACK A CAPABILITY: Call `search_pypi_packages` with a natural language query (e.g., "duckduckgo web search") to find an external library.
+    - IF YOU LACK A CAPABILITY: Identify the core, "base" keywords of the required capability. Call `search_pypi_packages` using ONLY these essential keywords (e.g., search "duckduckgo" instead of the full context like "Release date of X duckduckgo"). Think clearly about what the tool itself needs and omit any extra, task-specific data from your search query.
     - LIBRARY SELECTION (SECURITY & RECENCY): When reviewing PyPI results, you must strike an equilibrium between safety and functionality. Prioritize libraries with high community recognition/downloads to mitigate malware risks, but ensure they are reasonably updated so they do not break due to deprecated APIs. Avoid obscure, brand-new packages for critical tasks.
     - AFTER FINDING A LIBRARY: Generate a tool using `generate_server_code` that auto-installs the library. 
     - IF YOU DON'T KNOW HOW TO USE THE LIBRARY: Use `read_installed_module_code` to read its actual source code in the environment and learn its classes/functions before writing the logic.
