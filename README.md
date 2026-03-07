@@ -1,7 +1,8 @@
 # runa
 
-Runa is a self-evolving AI framework that automatically creates and integrates new tools and skills at runtime by using MCP server. Instead of relying on a static, pre-defined toolset, Runa dynamically writes the code it needs to solve novel problems, continuously expanding its own capabilities.
+Runa is a self-evolving AI framework that automatically creates and integrates new tools and skills at runtime by using MCP servers. Instead of relying on a static, pre-defined toolset, Runa dynamically writes the code it needs to solve novel problems by browsing GitHub repos, continuously expanding its own capabilities and creating new tools to be used.
 
+Runa has been tested with Qwen3.5-9B, a consumer-friendly LLM that you can run locally.
 ---
 
 ## **WARNING**
@@ -21,14 +22,14 @@ By using this software, you acknowledge and agree that:
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone [https://github.com/machachu56/runa.git](https://github.com/machachu56/runa.git)
+git clone https://github.com/machachu56/runa.git
 cd runa
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-Runa uses an autonomous client that you can configure with a specific objective, an API endpoint, and a directory for its tools.
+Runa uses an autonomous client that you can configure with a specific objective, an API endpoint where the LLM is running, and a directory for its tools.
 
 `main.py` file example.
 
