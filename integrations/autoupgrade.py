@@ -82,6 +82,57 @@ class RunaMCP:
                     return f"HTTP Error searching GitHub: {e.code} - {e.reason}"
                 except Exception as e:
                     return f"Error searching GitHub: {str(e)}"
+        @self.mcp.tool()
+        def install_github_repository(repo_url: str) -> str:
+            """
+            Attempts to install a Python package directly from a GitHub repository URL.
+            Note: This will only work if the repository is structured as a proper Python package 
+            (containing a setup.py or pyproject.toml file).
+            
+            Args:
+                repo_url: The full GitHub repository URL (e.g., 'https://github.com/psf/requests')
+            """
+            import subprocess
+            import sys
+            
+            # Basic validation
+            if not repo_url.startswith("https://github.com/"):
+                return "Error: Invalid GitHub URL. Must start with 'https://github.com/'"
+            
+            # Ensure it doesn't end with .git if the AI accidentally added it, 
+            # though pip usually handles it, it's safer to normalize.
+            clean_url = repo_url
+            if clean_url.endswith('.git'):
+                clean_url = clean_url[:-4]
+                
+            try:
+                print(f"[System] Attempting to install package from: {clean_url}")
+                install_target = f"git+{clean_url}.git"
+                
+                # Run pip install and capture the output
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", install_target],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    return (
+                        f"Successfully installed repository from {clean_url}.\n\n"
+                        f"Installation Output:\n{result.stdout}\n\n"
+                        f"Next step: You can now use `read_installed_module_code` to inspect its contents. "
+                        f"Keep in mind the import name (e.g., 'bs4') might differ slightly from the GitHub repository name (e.g., 'beautifulsoup4')."
+                    )
+                else:
+                    return (
+                        f"Failed to install repository. This usually happens if the repository is not "
+                        f"packaged properly (missing setup.py or pyproject.toml).\n\n"
+                        f"Error Output:\n{result.stderr}\n\n"
+                        f"Recommendation: Try using a different repository from the search."
+                    )
+                    
+            except Exception as e:
+                return f"Exception occurred during installation: {str(e)}"
             
         @self.mcp.tool()
         def read_installed_module_code(module_name: str) -> str:
