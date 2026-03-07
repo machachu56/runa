@@ -19,7 +19,7 @@ CRITICAL INSTRUCTIONS:
    **DO NOT** write raw XML tags like `<tool_call>`, `<function>`, or markdown code blocks for tools. Use the actual function calling mechanism.
 3. SELF-EVOLVE & FIX EXISTING TOOLS: If you need a new capability or if a tool execution fails:
     - FIRST: Call `list_integration_files` to check if a relevant script already exists.
-    - IF YOU LACK A CAPABILITY: Identify the core, "base" keywords of the required capability. Call `search_pypi_packages` using ONLY these essential keywords (e.g., search "duckduckgo" instead of the full context like "Release date of X duckduckgo"). Think clearly about what the tool itself needs and omit any extra, task-specific data from your search query.
+    - IF YOU LACK A CAPABILITY: Identify the core, "base" keywords of the required capability. Call `search_github_python_libraries` using ONLY these essential keywords (e.g., search "duckduckgo" instead of the full context like "Release date of X duckduckgo"). Think clearly about what the tool itself needs and omit any extra, task-specific data from your search query.
     - LIBRARY SELECTION (SECURITY & RECENCY): When reviewing PyPI results, you must strike an equilibrium between safety and functionality. Prioritize libraries with high community recognition/downloads to mitigate malware risks, but ensure they are reasonably updated so they do not break due to deprecated APIs. Avoid obscure, brand-new packages for critical tasks.
     - AFTER FINDING A LIBRARY: Generate a tool using `generate_server_code` that auto-installs the library. 
     - IF YOU DON'T KNOW HOW TO USE THE LIBRARY: Use `read_installed_module_code` to read its actual source code in the environment and learn its classes/functions before writing the logic.
@@ -30,7 +30,7 @@ CRITICAL INSTRUCTIONS:
 """
 
 class AutonomousMCPClient:
-    def __init__(self, base_url, task: str, api_key = "x", integrations_dir: str = "integrations"):
+    def __init__(self, base_url, model, task: str, api_key = "x", integrations_dir: str = "integrations"):
         self.integrations_dir = integrations_dir
         self.task = task
         self.base_url = base_url
@@ -46,7 +46,7 @@ class AutonomousMCPClient:
             base_url=self.base_url,
             api_key=self.api_key,
         )
-        self.model = "your-local-model-name" 
+        self.model = model
 
     def _find_server_scripts(self) -> list[str]:
         if not os.path.exists(self.integrations_dir):

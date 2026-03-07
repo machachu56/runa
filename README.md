@@ -44,6 +44,7 @@ USER_TASK = "Obtain the Public IPv4 address of the PC's connection."
 # 2. Initialize the autonomous client
 client = AutonomousMCPClient(
     task=USER_TASK, 
+    model="Qwen3.5-9B-Q5_K_M.gguf",
     base_url="[http://IP:PORT/v1](http://example.com:8080/v1)", # Point to your local or remote LLM API
     api_key="API_KEY", # Optional
     integrations_dir="integrations"         # Directory where runtime skills/tools are stored

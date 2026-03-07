@@ -36,40 +36,53 @@ class RunaMCP:
             return [f for f in os.listdir(self.integrations_dir) if f.endswith('.py')]
         
         @self.mcp.tool()
-        def search_pypi_packages(query: str, max_results: int = 5) -> str:
-            """
-            Searches the Python Package Index (PyPI) for libraries based on natural language or keywords.
-            Use this to find external libraries to accomplish tasks you don't currently have tools for.
-            """
-            import urllib.request
-            import urllib.parse
-            import re
+        def search_github_python_libraries(query: str, max_results: int = 5) -> str:
+                """
+                Searches GitHub for Python repositories based on natural language or keywords.
+                Use this to find external libraries to accomplish tasks you don't currently have tools for.
+                Results are sorted by stars to prioritize popular, community-trusted repositories.
+                """
+                import urllib.request
+                import urllib.parse
+                import json
+                
+                try:
+                    # Format the search query to strictly look for Python repositories
+                    encoded_query = urllib.parse.quote(f"{query} language:python")
+                    
+                    # Hit the GitHub API, sorting by stars (popularity/safety), and limit results
+                    url = f"https://api.github.com/search/repositories?q={encoded_query}&sort=stars&order=desc&per_page={max_results}"
+                    
+                    # GitHub strictly requires a User-Agent header for all API requests
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Runa-Autonomous-Agent'})
+                    
+                    with urllib.request.urlopen(req) as response:
+                        data = json.loads(response.read().decode('utf-8'))
+                    
+                    items = data.get("items", [])
+                    
+                    if not items:
+                        return f"No Python repositories found on GitHub for query: '{query}'"
+                    
+                    results = ["Found the following Python repositories on GitHub (sorted by stars):"]
+                    for i, repo in enumerate(items):
+                        name = repo.get("full_name", "Unknown")
+                        stars = repo.get("stargazers_count", 0)
+                        desc = repo.get("description", "No description provided.")
+                        repo_url = repo.get("html_url", "No URL")
+                        
+                        results.append(f"{i+1}. Repository: '{name}' (⭐ {stars} stars)\n   Description: {desc}\n   URL: {repo_url}")
+                    
+                    return "\n\n".join(results)
+                    
+                except urllib.error.HTTPError as e:
+                    # GitHub's unauthenticated search API has a rate limit of 10 requests per minute
+                    if e.code == 403:
+                        return "Error: GitHub API rate limit exceeded. Please wait a minute before trying again."
+                    return f"HTTP Error searching GitHub: {e.code} - {e.reason}"
+                except Exception as e:
+                    return f"Error searching GitHub: {str(e)}"
             
-            try:
-                # Format the search URL
-                url = f"https://pypi.org/search/?q={urllib.parse.quote(query)}"
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-                
-                with urllib.request.urlopen(req) as response:
-                    html = response.read().decode('utf-8')
-                
-                # Regex to extract the package snippet from PyPI's HTML structure
-                pattern = r'<span class="package-snippet__name">([^<]+)</span>.*?<span class="package-snippet__version">([^<]+)</span>.*?<p class="package-snippet__description">([^<]*)</p>'
-                matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
-                
-                if not matches:
-                    return f"No packages found on PyPI for query: '{query}'"
-                
-                results = ["Found the following packages on PyPI:"]
-                for i, match in enumerate(matches[:max_results]):
-                    name, version, desc = [m.strip() for m in match]
-                    results.append(f"{i+1}. Package: '{name}' (v{version}) - Description: {desc}")
-                
-                return "\n".join(results)
-                
-            except Exception as e:
-                return f"Error searching PyPI: {str(e)}"
-        
         @self.mcp.tool()
         def read_installed_module_code(module_name: str) -> str:
             """
