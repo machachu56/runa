@@ -36,6 +36,41 @@ class RunaMCP:
             return [f for f in os.listdir(self.integrations_dir) if f.endswith('.py')]
         
         @self.mcp.tool()
+        def search_pypi_packages(query: str, max_results: int = 5) -> str:
+            """
+            Searches the Python Package Index (PyPI) for libraries based on natural language or keywords.
+            Use this to find external libraries to accomplish tasks you don't currently have tools for.
+            """
+            import urllib.request
+            import urllib.parse
+            import re
+            
+            try:
+                # Format the search URL
+                url = f"https://pypi.org/search/?q={urllib.parse.quote(query)}"
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                
+                with urllib.request.urlopen(req) as response:
+                    html = response.read().decode('utf-8')
+                
+                # Regex to extract the package snippet from PyPI's HTML structure
+                pattern = r'<span class="package-snippet__name">([^<]+)</span>.*?<span class="package-snippet__version">([^<]+)</span>.*?<p class="package-snippet__description">([^<]*)</p>'
+                matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
+                
+                if not matches:
+                    return f"No packages found on PyPI for query: '{query}'"
+                
+                results = ["Found the following packages on PyPI:"]
+                for i, match in enumerate(matches[:max_results]):
+                    name, version, desc = [m.strip() for m in match]
+                    results.append(f"{i+1}. Package: '{name}' (v{version}) - Description: {desc}")
+                
+                return "\n".join(results)
+                
+            except Exception as e:
+                return f"Error searching PyPI: {str(e)}"
+        
+        @self.mcp.tool()
         def read_installed_module_code(module_name: str) -> str:
             """
             Reads the actual source code of an installed Python module or package.

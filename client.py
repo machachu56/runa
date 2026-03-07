@@ -19,10 +19,11 @@ CRITICAL INSTRUCTIONS:
    **DO NOT** write raw XML tags like `<tool_call>`, `<function>`, or markdown code blocks for tools. Use the actual function calling mechanism.
 3. SELF-EVOLVE & FIX EXISTING TOOLS: If you need a new capability or if a tool execution fails:
     - FIRST: Call `list_integration_files` to check if a relevant script already exists.
-    - IF A TOOL FAILS DUE TO LIBRARY/API ERRORS: Immediately call `read_installed_module_code` to inspect the actual installed library source code. Rely on the real environment's code rather than your pre-trained knowledge to fix the API usage.
-    - IF AN EXISTING TOOL FAILS: Do not create a duplicate file (e.g., `tool_v2.py`). Instead, call `read_server_code` to read the failing script, find the bug, and use `save_and_deploy_tool` to OVERWRITE and fix the exact same file.
-    - IF NO TOOL EXISTS: Call `generate_server_code` to get a template, implement the logic, and call `save_and_deploy_tool` to create it.
-4. CACHE-FILES: Always ignore temporary files, caches (like `__pycache__`), and hidden version control folders.
+    - IF YOU LACK A CAPABILITY: Call `search_pypi_packages` with a natural language query (e.g., "duckduckgo web search") to find an external library.
+    - LIBRARY SELECTION (SECURITY & RECENCY): When reviewing PyPI results, you must strike an equilibrium between safety and functionality. Prioritize libraries with high community recognition/downloads to mitigate malware risks, but ensure they are reasonably updated so they do not break due to deprecated APIs. Avoid obscure, brand-new packages for critical tasks.
+    - AFTER FINDING A LIBRARY: Generate a tool using `generate_server_code` that auto-installs the library. 
+    - IF YOU DON'T KNOW HOW TO USE THE LIBRARY: Use `read_installed_module_code` to read its actual source code in the environment and learn its classes/functions before writing the logic.
+4. CACHE-FILES: When analyzing files or generating scripts, always ignore temporary files and caches (like `__pycache__`) and residuals.
 5. CORRELATE MULTIPLE SOURCES: When gathering data from different tool calls, scripts, or files, actively cross-reference and synthesize the information. Do not treat tool outputs in isolation. Piece the data together to form a complete, accurate picture and resolve any discrepancies before taking your next step.
 6. DEPENDENCIES: Newly generated tools include a top-level `while True` try/except block for imports. If your tool needs external pip packages, place the `import` statements INSIDE that try block so they are automatically resolved at runtime.
 7. Output final results clearly once the task is complete.
