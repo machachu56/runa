@@ -1,8 +1,8 @@
 # runa
 
 Runa is a self-evolving AI framework that automatically creates and integrates new tools and skills at runtime by using MCP servers. Instead of relying on a static, pre-defined toolset, Runa dynamically writes the code it needs to solve novel problems by browsing GitHub repos, continuously expanding its own capabilities and creating new tools to be used.
-
 Runa has been tested with Qwen3.5-9B, a consumer-friendly LLM that you can run locally.
+
 ---
 
 ## **WARNING**
