@@ -40,7 +40,7 @@ class AutonomousMCPClient:
         self.tool_registry = {}  
         self.mcp_tools = {}
         self.script_mtimes = {}      
-        self.server_stacks = {}
+        self.exit_stack = AsyncExitStack()
         
         # Configure OpenAI compatible client
         self.llm = AsyncOpenAI(
@@ -78,12 +78,6 @@ class AutonomousMCPClient:
                 else:
                     print(f"[System] Detected updates in '{server_name}'. Reloading...")
                     new_servers_found = True
-                    
-                    if server_name in self.server_stacks:
-                        await self.server_stacks[server_name].aclose()
-                        
-                    self.mcp_tools = {name: tool for name, tool in self.mcp_tools.items() 
-                                      if self.tool_registry.get(name) != server_name}
             else:
                 print(f"[System] Booting new server: '{server_name}'...")
                 new_servers_found = True
@@ -95,15 +89,13 @@ class AutonomousMCPClient:
             )
 
             try:
-                stack = AsyncExitStack()
-                self.server_stacks[server_name] = stack
-                
-                stdio_transport = await stack.enter_async_context(stdio_client(server_params))
+                stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
                 read, write = stdio_transport
                 
-                session = await stack.enter_async_context(ClientSession(read, write))
+                session = await self.exit_stack.enter_async_context(ClientSession(read, write))
                 await session.initialize()
                 
+                # Update our dictionaries with the new session and the latest modification time
                 self.sessions[server_name] = session
                 self.script_mtimes[server_name] = current_mtime
                 
