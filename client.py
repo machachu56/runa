@@ -19,9 +19,10 @@ CRITICAL INSTRUCTIONS:
    **DO NOT** write raw XML tags like `<tool_call>`, `<function>`, or markdown code blocks for tools. Use the actual function calling mechanism.
 3. SELF-EVOLVE & FIX EXISTING TOOLS: If you need a new capability or if a tool execution fails:
     - FIRST: Call `list_integration_files` to check if a relevant script already exists.
+    - IF A TOOL FAILS DUE TO LIBRARY/API ERRORS: Immediately call `read_installed_module_code` to inspect the actual installed library source code. Rely on the real environment's code rather than your pre-trained knowledge to fix the API usage.
     - IF AN EXISTING TOOL FAILS: Do not create a duplicate file (e.g., `tool_v2.py`). Instead, call `read_server_code` to read the failing script, find the bug, and use `save_and_deploy_tool` to OVERWRITE and fix the exact same file.
     - IF NO TOOL EXISTS: Call `generate_server_code` to get a template, implement the logic, and call `save_and_deploy_tool` to create it.
-4. FILE SYSTEM TRACKING: When generating scripts that interact with the file system, ignore temporary files and caches (like `__pycache__`).
+4. CACHE-FILES: Always ignore temporary files, caches (like `__pycache__`), and hidden version control folders.
 5. CORRELATE MULTIPLE SOURCES: When gathering data from different tool calls, scripts, or files, actively cross-reference and synthesize the information. Do not treat tool outputs in isolation. Piece the data together to form a complete, accurate picture and resolve any discrepancies before taking your next step.
 6. DEPENDENCIES: Newly generated tools include a top-level `while True` try/except block for imports. If your tool needs external pip packages, place the `import` statements INSIDE that try block so they are automatically resolved at runtime.
 7. Output final results clearly once the task is complete.
@@ -44,7 +45,7 @@ class AutonomousMCPClient:
             base_url=self.base_url,
             api_key=self.api_key,
         )
-        self.model = "your-local-model-name" # Make sure this is a model good at coding/tools (e.g. Qwen2.5-Coder or Llama-3.1)
+        self.model = "your-local-model-name" 
 
     def _find_server_scripts(self) -> list[str]:
         if not os.path.exists(self.integrations_dir):
@@ -52,6 +53,7 @@ class AutonomousMCPClient:
 
         scripts = []
         for root, dirs, files in os.walk(self.integrations_dir):
+            # Ignore hidden directories (like .git) and caches
             dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
             for file in files:
                 if file.endswith('.py') and not file.startswith('.'):
@@ -156,7 +158,7 @@ class AutonomousMCPClient:
                 model=self.model,
                 messages=messages,
                 tools=tools_schema if tools_schema else None,
-                temperature=0.1 # Lowered temp so it hallucinates less formatting
+                temperature=0.1 
             )
 
             message = response.choices[0].message
@@ -166,13 +168,12 @@ class AutonomousMCPClient:
             if content_text:
                 print(f"\n[Agent Thought]\n{content_text}")
 
-            # Check if the model actually triggered the API's tool feature
             if message.tool_calls:
                 for tool_call in message.tool_calls:
                     try:
                         args = json.loads(tool_call.function.arguments)
                     except json.JSONDecodeError:
-                        args = {} # Fallback if model gives bad JSON
+                        args = {} 
                         
                     result = await self.execute_tool(tool_call.function.name, args)
                     messages.append({
@@ -181,19 +182,16 @@ class AutonomousMCPClient:
                         "name": tool_call.function.name,
                         "content": result
                     })
-                continue # Loop again so the agent can read the tool result
+                continue 
 
-            # If no native tool calls, check if the model hallucinated fake XML tools
             if "<tool_call>" in content_text or "<function>" in content_text:
                 print("\n[System Warning] Model attempted to use text-based XML tools instead of native JSON.")
-                # Force the model to retry
                 messages.append({
                     "role": "user",
                     "content": "SYSTEM ERROR: You attempted to call a tool using raw text/XML tags. You MUST use the proper JSON tool calling format provided by the API. Please try again."
                 })
-                continue # Loop again to give the model a second chance
+                continue 
 
-            # If no tool calls and no fake XML, the agent considers the task finished
             print("\n[System] Task Complete or No More Actions.")
             break
 

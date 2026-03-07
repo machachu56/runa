@@ -2,6 +2,8 @@ import os
 import sys
 from typing import Callable
 from mcp.server.fastmcp import FastMCP
+import importlib
+import inspect
 
 class RunaMCP:
     """
@@ -32,6 +34,38 @@ class RunaMCP:
             if not os.path.exists(self.integrations_dir):
                 return []
             return [f for f in os.listdir(self.integrations_dir) if f.endswith('.py')]
+        
+        @self.mcp.tool()
+        def read_installed_module_code(module_name: str) -> str:
+            """
+            Reads the actual source code of an installed Python module or package.
+            Use this to inspect library internals, verify available methods, or debug failed imports.
+            
+            Args:
+                module_name: The dot-separated module path (e.g., 'os', 'mcp.server.fastmcp', 'requests.models').
+            """
+            try:
+                # Dynamically import the requested module
+                module = importlib.import_module(module_name)
+                
+                # Attempt to retrieve the source code
+                source = inspect.getsource(module)
+                return source
+                
+            except ModuleNotFoundError:
+                return f"Error: Module '{module_name}' is not installed or cannot be found in the current environment."
+                
+            except TypeError:
+                # This exception triggers if the target is a built-in module (C extension) 
+                # where raw Python source code is not available.
+                try:
+                    file_path = inspect.getfile(module)
+                    return f"Error: '{module_name}' is a compiled/built-in module. Source code cannot be read directly as text. File located at: {file_path}"
+                except TypeError:
+                    return f"Error: '{module_name}' is a built-in module (like 'sys'). Source code is not accessible."
+                    
+            except Exception as e:
+                return f"Error reading module '{module_name}': {str(e)}"
 
         @self.mcp.tool()
         def read_server_code(server_name: str) -> str:
